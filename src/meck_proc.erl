@@ -72,10 +72,16 @@
                   expire_at :: erlang:timestamp()}).
 
 %%%============================================================================
+%%% Macros
+%%%============================================================================
+-define(DEBUGGER, edb_server).
+
+%%%============================================================================
 %%% Types
 %%%============================================================================
 
 -type tracker() :: #tracker{}.
+-type action() :: backup | restore.
 
 %%%============================================================================
 %%% API
@@ -230,6 +236,7 @@ init([Mod, Options]) ->
     History = if NoHistory -> undefined; true -> [] end,
     CanExpect = resolve_can_expect(Mod, Exports, Options),
     Expects = init_expects(Exports, Options),
+    try_handle_original_breakpoints(Mod, ?DEBUGGER, backup),
     process_flag(trap_exit, true),
     try
         Forms = meck_code_gen:to_forms(Mod, Expects),
@@ -352,6 +359,7 @@ terminate(_Reason, #state{mod = Mod, original = OriginalState,
                           was_sticky = WasSticky, restore = Restore}) ->
     BackupCover = export_original_cover(Mod, OriginalState),
     cleanup(Mod),
+    try_handle_original_breakpoints(Mod, ?DEBUGGER, restore),
     restore_original(Mod, OriginalState, WasSticky, BackupCover),
     case Restore andalso false =:= code:is_loaded(Mod) of
         true ->
@@ -633,6 +641,23 @@ restore_original(Mod, {{File, OriginalCover, Options}, _Bin}, WasSticky, BackupC
     ok = cover:import(OriginalCover),
     ok = file:delete(OriginalCover),
     ok.
+
+-spec try_handle_original_breakpoints(module(), Debugger :: atom(), Action :: action()) -> ok.
+try_handle_original_breakpoints(Mod, Debugger, Action) ->
+    try code:is_loaded(Debugger) of
+        false -> ok;
+        _ -> handle_original_breakpoints(Mod, Debugger, Action)
+    catch
+        _:_ -> ok
+    end.
+
+-spec handle_original_breakpoints(module(), Debugger :: atom(), Action :: action()) -> ok.
+handle_original_breakpoints(Mod, Debugger, backup) ->
+    Debugger:add_module_substitute(Mod, meck_util:original_name(Mod), [
+        {meck_code_gen, eval, 5}
+    ]);
+handle_original_breakpoints(Mod, Debugger, restore) ->
+    Debugger:remove_module_substitute(meck_util:original_name(Mod)).
 
 %% @doc Export the cover data for `<name>_meck_original' and modify
 %% the data so it can be imported under `<name>'.
