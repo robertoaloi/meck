@@ -41,3 +41,33 @@ jobs:
 
       - name: Test
         run: rebar3 do eunit, ct
+
+  elp:
+    runs-on: ubuntu-24.04
+    name: ELP
+    env:
+      # setup-elp downloads the ELP build matching the installed Erlang/OTP
+      # <major>.<minor>, so OTP_VERSION must have an asset in the ELP release.
+      ELP_VERSION: "2026-10-05"
+      OTP_VERSION: "28.5"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{env.OTP_VERSION}}
+          rebar3-version: "3"
+
+      - uses: erlef/setup-elp@7be8461ac17ddcf91ea0f8f01bee0452a3e05561
+        with:
+          elp-version: ${{env.ELP_VERSION}}
+
+      # Non-blocking until the existing findings are fixed
+      - name: Lint
+        run: elp lint --no-connect
+        continue-on-error: true
+
+      # Non-blocking until the existing findings are fixed
+      - name: eqWAlizer
+        run: elp eqwalize-all --no-connect
+        continue-on-error: true
