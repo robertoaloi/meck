@@ -12,6 +12,8 @@ jobs:
     env:
       ELP_VERSION: "2026-11-16"
     strategy:
+      # Let the OTP 29 job, the one annotating findings, finish when another one fails
+      fail-fast: false
       matrix:
         otp: ["27", "28", "29"]
         rebar3: ["3"]
@@ -41,9 +43,11 @@ jobs:
       - name: Analyze
         run: rebar3 do xref, dialyzer
 
-      - uses: erlef/setup-elp@bf9c43cb7f514f3e97dc8bd159fca6c016d3ffee # elp-problem-matchers
+      - uses: erlef/setup-elp@731aba4d81a842d5acb0595644085efea27b8e1d # elp-problem-matchers
         with:
           elp-version: ${{env.ELP_VERSION}}
+          # Annotate findings once, not once per OTP version
+          problem-matchers: ${{ matrix.otp == '29' }}
 
       - name: ELP lint
         run: elp lint --no-connect --format json
