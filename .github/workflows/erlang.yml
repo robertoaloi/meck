@@ -80,6 +80,13 @@ jobs:
           sbt assembly
           native-image -H:IncludeResources=application.conf --no-server --no-fallback -jar target/scala-3.6.4/eqwalizer.jar eqwalizer
 
+      # The syntax kinds generated in ELP match tree-sitter-erlang 0.22.0, but the
+      # workspace still pins 0.21.0
+      - name: Use tree-sitter-erlang 0.22.0
+        run: |
+          sed -i 's/^tree-sitter-erlang = "0.21.0"/tree-sitter-erlang = "0.22.0"/' Cargo.toml
+          cargo update -p tree-sitter-erlang
+
       - name: Build ELP
         env:
           EQWALIZER_DIR: ${{github.workspace}}/eqwalizer/eqwalizer
